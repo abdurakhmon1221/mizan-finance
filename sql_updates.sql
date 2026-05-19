@@ -55,3 +55,22 @@ CREATE POLICY "Admin va Owner tahrirlay oladi" ON public.teachers FOR UPDATE USI
 
 -- Tranzaksiyalarga o'qituvchini bog'lash uchun
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS teacher_id UUID REFERENCES public.teachers(id);
+
+-- 3. Budgets (Oylik byudjetlar) jadvalini yaratish
+CREATE TABLE IF NOT EXISTS public.budgets (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    month_year TEXT NOT NULL, -- Format: YYYY-MM
+    department TEXT NOT NULL,
+    category TEXT NOT NULL,
+    limit_amount NUMERIC NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    created_by UUID REFERENCES public.profiles(id),
+    UNIQUE(month_year, department, category)
+);
+
+ALTER TABLE public.budgets ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Barcha ko'ra oladi" ON public.budgets FOR SELECT USING (true);
+CREATE POLICY "Admin va Owner tahrirlay oladi" ON public.budgets FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('owner', 'admin'))
+);
