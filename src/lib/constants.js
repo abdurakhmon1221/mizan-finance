@@ -39,6 +39,7 @@ export const EXPENSE_CATEGORIES = [
   { id: 'materiallar', label: '📖 O\'quv materiallari', color: '#3b82f6' },
   { id: 'transport', label: '🚗 Transport', color: '#84cc16' },
   { id: 'soliq', label: '📋 Soliq', color: '#6366f1' },
+  { id: 'qarz_qaytarish', label: '🤝 Qarz qaytarish', color: '#14b8a6' },
   { id: 'boshqa', label: '📦 Boshqa', color: '#6b7280' },
 ]
 

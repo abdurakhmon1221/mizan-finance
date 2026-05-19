@@ -13,6 +13,7 @@ const COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec
 export default function DashboardPage() {
   const { profile } = useAuth()
   const [stats, setStats]     = useState(null)
+  const [balances, setBalances] = useState({ cash: 0, card: 0, bank: 0, total: 0 })
   const [monthly, setMonthly] = useState([])
   const [byCat, setByCat]     = useState([])
   const [recent, setRecent]   = useState([])
@@ -32,7 +33,23 @@ export default function DashboardPage() {
     setLoading(true)
     const dateFrom = getDateFrom()
 
-    // All transactions for period
+    // 1. Fetch cumulative balances (all-time, not filtered by date)
+    const { data: allTxns } = await supabase
+      .from('transactions')
+      .select('type, amount, payment_method')
+      .is('deleted_at', null)
+      .in('payment_method', ['cash', 'card', 'bank'])
+
+    let b = { cash: 0, card: 0, bank: 0, total: 0 }
+    ;(allTxns || []).forEach(t => {
+      const pm = t.payment_method
+      if (t.type === 'income') b[pm] += t.amount
+      else if (t.type === 'expense') b[pm] -= t.amount
+    })
+    b.total = b.cash + b.card + b.bank
+    setBalances(b)
+
+    // 2. Fetch data for selected period
     const { data: txns } = await supabase
       .from('transactions')
       .select('*')
@@ -89,6 +106,36 @@ export default function DashboardPage() {
           <h1>📊 Dashboard</h1>
           <p>Salom, {profile?.full_name}! Bugungi moliyaviy ko'rsatkichlar.</p>
         </div>
+      </div>
+
+      {/* ── Kassa Qoldig'i (All time) ── */}
+      <div className="card" style={{ padding: '16px 24px', background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)', color: 'white', border: 'none' }}>
+        <h3 style={{ fontSize: 14, fontWeight: 500, opacity: 0.9, marginBottom: 12 }}>Haqiqiy pul qoldig'i (Kassa)</h3>
+        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'baseline' }}>
+          <div>
+            <div style={{ fontSize: 12, opacity: 0.8 }}>Jami Kassa</div>
+            <div style={{ fontSize: 24, fontWeight: 700 }}>{formatCurrency(balances.total)}</div>
+          </div>
+          <div style={{ width: 1, background: 'rgba(255,255,255,0.2)', height: 32 }} className="desktop-only" />
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: 12, opacity: 0.8 }}>💵 Naqd pul</div>
+              <div style={{ fontSize: 16, fontWeight: 600 }}>{formatCurrency(balances.cash)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 12, opacity: 0.8 }}>💳 Plastik Karta</div>
+              <div style={{ fontSize: 16, fontWeight: 600 }}>{formatCurrency(balances.card)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 12, opacity: 0.8 }}>🏦 Hisob raqam</div>
+              <div style={{ fontSize: 16, fontWeight: 600 }}>{formatCurrency(balances.bank)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+        <h3 style={{ fontSize: 16 }}>Davr hisoboti</h3>
         <div className="period-tabs">
           {[['month','Bu oy'],['quarter','3 oy'],['year','Bu yil']].map(([val, label]) => (
             <button key={val} className={`period-btn ${period === val ? 'active' : ''}`} onClick={() => setPeriod(val)}>{label}</button>

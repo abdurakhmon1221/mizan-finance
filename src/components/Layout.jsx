@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import {
-  BarChart2, Wallet, PlusCircle, FileText, Users, LogOut
+  BarChart2, Wallet, PlusCircle, FileText, Users, LogOut, BookOpen
 } from 'lucide-react'
 import { ROLE_LABELS } from '../lib/constants'
 
@@ -10,6 +10,7 @@ const navItems = [
   { to: '/transactions',  icon: Wallet,     label: 'Tranzaksiyalar', perm: null },
   { to: '/add',           icon: PlusCircle, label: 'Qo\'shish',    perm: 'addTransaction' },
   { to: '/reports',       icon: FileText,   label: 'Hisobotlar',   perm: 'viewReports' },
+  { to: '/debts',         icon: BookOpen,   label: 'Qarzlar',      perm: 'viewReports' },
   { to: '/users',         icon: Users,      label: 'Foydalanuvchilar', perm: 'manageUsers' },
 ]
 
