@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Environment variables (Supabase keys — GitHub ga yuklanmasin!)
+.env
+.env.*
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
