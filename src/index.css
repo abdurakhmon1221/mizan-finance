@@ -113,12 +113,42 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 .month-picker { padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; outline: none; }
 
 /* Summary Row */
-.summary-row { display: flex; gap: 24px; padding: 16px; background: white; border-radius: 12px; box-shadow: var(--shadow); }
-.summary-row span { font-weight: 600; font-size: 16px; }
-.sum-income { color: var(--success); }
-.sum-expense { color: var(--danger); }
+.summary-row { display: flex; align-items: center; gap: 0; padding: 16px 24px; background: white; border-radius: 12px; box-shadow: var(--shadow); }
+.summary-item { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.summary-label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+.summary-divider { width: 1px; height: 40px; background: var(--border); margin: 0 24px; flex-shrink: 0; }
+.sum-income { color: var(--success); font-size: 18px; font-weight: 700; }
+.sum-expense { color: var(--danger); font-size: 18px; font-weight: 700; }
+.sum-profit { font-size: 18px; font-weight: 700; }
 .sum-profit.positive { color: var(--primary); }
 .sum-profit.negative { color: var(--danger); }
+
+/* Dept Summary (Reports) */
+.dept-summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.dept-summary-item { padding: 14px 16px; border-radius: 10px; display: flex; flex-direction: column; gap: 4px; }
+.dept-summary-item.full { grid-column: 1 / -1; }
+.dept-summary-item.income { background: #f0fdf4; }
+.dept-summary-item.expense { background: #fff1f2; }
+.dept-summary-item.profit { background: #eff6ff; }
+.dept-summary-item.loss { background: #fff1f2; }
+.dept-summary-label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+.dept-summary-value { font-size: 18px; font-weight: 700; }
+.dept-summary-item.income .dept-summary-value { color: var(--success); }
+.dept-summary-item.expense .dept-summary-value { color: var(--danger); }
+.dept-summary-item.profit .dept-summary-value { color: var(--primary); }
+.dept-summary-item.loss .dept-summary-value { color: var(--danger); }
+
+/* Date filter labels */
+.date-range-group { display: flex; align-items: center; gap: 6px; }
+.date-label { font-size: 13px; font-weight: 500; color: var(--text-muted); white-space: nowrap; }
+
+/* Edit Modal */
+.edit-modal { background: white; border-radius: 16px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
+.edit-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.edit-modal-header h3 { font-size: 18px; font-weight: 700; margin: 0; }
+
+/* Empty state */
+.empty-state { text-align: center; padding: 40px; color: #94a3b8; }
 
 /* Forms */
 .type-toggle { display: flex; background: var(--secondary); padding: 4px; border-radius: 8px; width: max-content; margin-bottom: 24px; }
