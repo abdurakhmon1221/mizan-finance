@@ -10,6 +10,7 @@ import Transactions from './pages/Transactions'
 import Reports from './pages/Reports'
 import Users from './pages/Users'
 import Debts from './pages/Debts'
+import Students from './pages/Students'
 import NoAccess from './pages/NoAccess'
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
           <Route path="/no-access" element={<NoAccess />} />
           
           <Route path="/" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
+          <Route path="/students" element={<ProtectedRoute><Layout><Students /></Layout></ProtectedRoute>} />
           <Route path="/add" element={<ProtectedRoute require="addTransaction"><Layout><AddTransaction /></Layout></ProtectedRoute>} />
           <Route path="/transactions" element={<ProtectedRoute><Layout><Transactions /></Layout></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute require="viewReports"><Layout><Reports /></Layout></ProtectedRoute>} />

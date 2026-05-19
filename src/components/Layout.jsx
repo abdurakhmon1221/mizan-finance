@@ -1,17 +1,18 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import {
-  BarChart2, Wallet, PlusCircle, FileText, Users, LogOut, BookOpen
+  BarChart2, Wallet, PlusCircle, FileText, Users, LogOut, BookOpen, GraduationCap
 } from 'lucide-react'
 import { ROLE_LABELS } from '../lib/constants'
 
 const navItems = [
-  { to: '/',              icon: BarChart2,  label: 'Dashboard',    perm: 'viewDashboard' },
-  { to: '/transactions',  icon: Wallet,     label: 'Tranzaksiyalar', perm: null },
-  { to: '/add',           icon: PlusCircle, label: 'Qo\'shish',    perm: 'addTransaction' },
-  { to: '/reports',       icon: FileText,   label: 'Hisobotlar',   perm: 'viewReports' },
-  { to: '/debts',         icon: BookOpen,   label: 'Qarzlar',      perm: 'viewReports' },
-  { to: '/users',         icon: Users,      label: 'Foydalanuvchilar', perm: 'manageUsers' },
+  { to: '/',              icon: BarChart2,      label: 'Dashboard',    perm: 'viewDashboard' },
+  { to: '/students',      icon: GraduationCap,  label: 'O\'quvchilar',  perm: null },
+  { to: '/transactions',  icon: Wallet,         label: 'Tranzaksiyalar', perm: null },
+  { to: '/add',           icon: PlusCircle,     label: 'Qo\'shish',    perm: 'addTransaction' },
+  { to: '/reports',       icon: FileText,       label: 'Hisobotlar',   perm: 'viewReports' },
+  { to: '/debts',         icon: BookOpen,       label: 'Qarzlar',      perm: 'viewReports' },
+  { to: '/users',         icon: Users,          label: 'Foydalanuvchilar', perm: 'manageUsers' },
 ]
 
 export default function Layout({ children }) {
