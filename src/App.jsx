@@ -14,6 +14,7 @@ import Teachers from './pages/Teachers'
 import Budgets from './pages/Budgets'
 import NoAccess from './pages/NoAccess'
 import Groups from './pages/Groups'
+import Users from './pages/Users'
 
 function App() {
   return (
