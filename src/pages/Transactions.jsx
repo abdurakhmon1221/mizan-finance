@@ -1,122 +1,33 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import {
-  formatCurrency, formatDate, getCategoryInfo,
-  DEPT_LABELS, INCOME_CATEGORIES, EXPENSE_CATEGORIES,
-  PAYMENT_METHODS
-} from '../lib/constants'
-import { Search, X, Download, Trash2, Eye, Edit3, Check, ChevronDown } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import { formatCurrency, DEPT_LABELS } from '../lib/constants'
+import { Wallet, Search, Filter, Trash2, Eye, ShieldAlert } from 'lucide-react'
 
-// ── Edit Modal ────────────────────────────────────────────────────────────────
-function EditModal({ txn, onClose, onSaved }) {
-  const [amount, setAmount]     = useState(String(txn.amount))
-  const [note, setNote]         = useState(txn.note || '')
-  const [date, setDate]         = useState(txn.transaction_date)
-  const [dept, setDept]         = useState(txn.department)
-  const [category, setCategory] = useState(txn.category)
-  const [payMethod, setPayMethod] = useState(txn.payment_method || 'cash')
-  const [thirdParty, setThirdParty] = useState(txn.third_party_name || '')
-  const [saving, setSaving]     = useState(false)
-
-  const cats = txn.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
-
-  const handleSave = async () => {
-    const numAmount = parseInt(amount.replace(/\D/g, ''), 10)
-    if (!numAmount) return alert('Summani kiriting')
+function DeleteModal({ txn, onClose, onConfirm }) {
+  const [saving, setSaving] = useState(false)
+  const handleConfirm = async () => {
     setSaving(true)
-    const { error } = await supabase.from('transactions').update({
-      amount: numAmount,
-      note: note.trim(),
-      transaction_date: date,
-      department: dept,
-      category,
-      payment_method: payMethod,
-      is_third_party: payMethod === 'debt' && !!thirdParty,
-      third_party_name: payMethod === 'debt' ? thirdParty : null,
-    }).eq('id', txn.id)
+    const { error } = await supabase
+      .from('transactions')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', txn.id)
     setSaving(false)
-    if (error) return alert('Xatolik: ' + error.message)
-    onSaved()
-    onClose()
+    if (error) alert(error.message)
+    else { onConfirm(); onClose(); }
   }
-
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="edit-modal" onClick={e => e.stopPropagation()}>
-        <div className="edit-modal-header">
-          <h3>✏️ Tahrirlash</h3>
-          <button className="btn-icon" onClick={onClose}><X size={18}/></button>
+      <div className="modal-box" onClick={e => e.stopPropagation()}>
+        <h3>O'chirishni tasdiqlang</h3>
+        <p style={{ margin: '16px 0', color: '#64748b' }}>Siz rostdan ham ushbu tranzaksiyani bekor qilmoqchimisiz? (Mablag' kassadan qaytariladi)</p>
+        <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, marginBottom: 20 }}>
+          <strong>{formatCurrency(txn.amount)}</strong> — {txn.note || txn.category}
         </div>
-
-        <div className="form-grid" style={{ gap: 16 }}>
-          <div className="form-group full-width">
-            <label>Summa (so'm) *</label>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={parseInt(amount.replace(/\D/g,'') || '0').toLocaleString('uz-UZ')}
-              onChange={e => setAmount(e.target.value.replace(/\D/g,''))}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Kategoriya</label>
-            <select value={category} onChange={e => setCategory(e.target.value)}>
-              {cats.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label>Bo'lim</label>
-            <select value={dept} onChange={e => setDept(e.target.value)}>
-              {Object.entries(DEPT_LABELS).map(([v, l]) => (
-                <option key={v} value={v}>{l}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label>To'lov usuli</label>
-            <select value={payMethod} onChange={e => setPayMethod(e.target.value)}>
-              {PAYMENT_METHODS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label>Sana</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} />
-          </div>
-
-          {payMethod === 'debt' && (
-            <div className="form-group full-width">
-              <label>Kreditor ismi (3-chi shaxs)</label>
-              <input
-                type="text"
-                value={thirdParty}
-                onChange={e => setThirdParty(e.target.value)}
-                placeholder="Masalan: Bobur aka"
-              />
-            </div>
-          )}
-
-          <div className="form-group full-width">
-            <label>Izoh</label>
-            <input
-              type="text"
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              placeholder="Izoh kiriting"
-              maxLength={200}
-            />
-          </div>
-        </div>
-
-        <div className="form-actions" style={{ marginTop: 20 }}>
+        <div className="modal-actions">
           <button className="btn-secondary" onClick={onClose}>Bekor</button>
-          <button className="btn-primary" onClick={handleSave} disabled={saving}>
-            <Check size={15}/> {saving ? 'Saqlanmoqda...' : 'Saqlash'}
+          <button className="btn-primary" style={{ background: '#ef4444' }} onClick={handleConfirm} disabled={saving}>
+            O'chirish
           </button>
         </div>
       </div>
@@ -124,290 +35,162 @@ function EditModal({ txn, onClose, onSaved }) {
   )
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
 export default function TransactionsPage() {
   const { profile, can } = useAuth()
-  const [txns, setTxns]       = useState([])
+  const [txns, setTxns] = useState([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch]   = useState('')
+  const [search, setSearch] = useState('')
   const [filterType, setFilterType] = useState('all')
-  const [filterDept, setFilterDept] = useState('all')
-  const [dateFrom, setDateFrom]     = useState('')
-  const [dateTo, setDateTo]         = useState('')
-  const [previewImg, setPreviewImg] = useState(null)
-  const [deleteId, setDeleteId]     = useState(null)
-  const [editTxn, setEditTxn]       = useState(null)
+  const [showDeleted, setShowDeleted] = useState(false) // Audit Trail uchun
+  const [delTxn, setDelTxn] = useState(null)
 
-  const isOwner = profile?.role === 'owner'
+  useEffect(() => { fetchTxns() }, [showDeleted])
 
-  const fetchTxns = useCallback(async () => {
+  const fetchTxns = async () => {
     setLoading(true)
-    let q = supabase
+    let query = supabase
       .from('transactions')
-      .select('*')
-      .is('deleted_at', null)
-      .order('transaction_date', { ascending: false })
+      .select('*, profiles:created_by(full_name)')
+      .order('created_at', { ascending: false })
 
-    if (!isOwner) q = q.eq('created_by', profile?.id)
-    if (filterType !== 'all') q = q.eq('type', filterType)
-    if (filterDept !== 'all') q = q.eq('department', filterDept)
-    if (dateFrom) q = q.gte('transaction_date', dateFrom)
-    if (dateTo)   q = q.lte('transaction_date', dateTo)
+    // Agar o'chirilganlarni ko'rmoqchi bo'lmasak, ularni yashiramiz
+    if (!showDeleted) {
+      query = query.is('deleted_at', null)
+    }
 
-    const { data } = await q
+    const { data } = await query
     setTxns(data || [])
     setLoading(false)
-  }, [filterType, filterDept, dateFrom, dateTo, profile, isOwner])
-
-  useEffect(() => { fetchTxns() }, [fetchTxns])
-
-  const filtered = txns.filter(t =>
-    (t.note || '').toLowerCase().includes(search.toLowerCase()) ||
-    (t.category || '').toLowerCase().includes(search.toLowerCase()) ||
-    (t.third_party_name || '').toLowerCase().includes(search.toLowerCase())
-  )
-
-  const totalIncome  = filtered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-  const totalExpense = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-
-  const handleDelete = async () => {
-    await supabase.from('transactions').update({ deleted_at: new Date().toISOString() }).eq('id', deleteId)
-    setDeleteId(null)
-    fetchTxns()
   }
 
-  const handleExport = () => {
-    const rows = filtered.map(t => ({
-      'Sana': t.transaction_date,
-      'Tur': t.type === 'income' ? 'Kirim' : 'Xarajat',
-      "Bo'lim": DEPT_LABELS[t.department] || t.department,
-      'Kategoriya': getCategoryInfo(t.category, t.type).label,
-      'Izoh': t.note || '',
-      "To'lov usuli": t.payment_method || '',
-      'Kreditor': t.third_party_name || '',
-      'Summa': t.amount,
-    }))
-    const ws = XLSX.utils.json_to_sheet(rows)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Tranzaksiyalar')
-    XLSX.writeFile(wb, `Mizan_${new Date().toLocaleDateString('uz-UZ')}.xlsx`)
-  }
-
-  const clearFilters = () => {
-    setFilterType('all'); setFilterDept('all')
-    setDateFrom(''); setDateTo(''); setSearch('')
-  }
-  const hasFilters = filterType !== 'all' || filterDept !== 'all' || dateFrom || dateTo || search
+  const filtered = txns.filter(t => {
+    const matchType = filterType === 'all' || t.type === filterType
+    const text = `${t.category} ${t.note} ${t.payment_method} ${t.third_party_name || ''} ${t.profiles?.full_name || ''}`.toLowerCase()
+    const matchSearch = text.includes(search.toLowerCase())
+    return matchType && matchSearch
+  })
 
   return (
     <div className="page">
-      {/* ── Image Preview Modal ── */}
-      {previewImg && (
-        <div className="modal-overlay" onClick={() => setPreviewImg(null)}>
-          <div className="img-modal" onClick={e => e.stopPropagation()}>
-            <button className="img-modal-close" onClick={() => setPreviewImg(null)}><X size={18}/></button>
-            <img src={previewImg} alt="chek" />
-          </div>
-        </div>
-      )}
+      {delTxn && <DeleteModal txn={delTxn} onClose={() => setDelTxn(null)} onConfirm={fetchTxns} />}
 
-      {/* ── Delete Confirm Modal ── */}
-      {deleteId && (
-        <div className="modal-overlay">
-          <div className="modal-box">
-            <p>🗑️ Bu yozuvni o'chirmoqchimisiz?</p>
-            <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setDeleteId(null)}>Bekor</button>
-              <button className="btn-danger" onClick={handleDelete}>O'chirish</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Edit Modal ── */}
-      {editTxn && (
-        <EditModal
-          txn={editTxn}
-          onClose={() => setEditTxn(null)}
-          onSaved={fetchTxns}
-        />
-      )}
-
-      {/* ── Header ── */}
       <div className="page-header">
         <div>
-          <h1>🧾 Tranzaksiyalar</h1>
-          <p>{filtered.length} ta yozuv</p>
+          <h1><Wallet size={24} style={{ display: 'inline', verticalAlign: 'text-bottom' }}/> Kassa Harakati (Audit Log)</h1>
+          <p>Barcha kirim, xarajat va tahrirlar tarixi</p>
         </div>
-        <button className="btn-export" onClick={handleExport}>
-          <Download size={15}/> Excel
-        </button>
       </div>
 
-      {/* ── Filter Bar ── */}
       <div className="filter-bar">
-        <div className="search-box">
-          <Search size={15}/>
-          <input
-            type="text"
-            placeholder="Izoh, kategoriya yoki kreditor..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          {search && <button onClick={() => setSearch('')}><X size={13}/></button>}
+        <div className="filter-group" style={{ flex: 1 }}>
+          <label>Qidirish</label>
+          <div style={{ position: 'relative' }}>
+            <Search size={16} style={{ position: 'absolute', left: 12, top: 10, color: '#94a3b8' }} />
+            <input 
+              type="text" 
+              placeholder="Izoh, kategoriya yoki xodim izlash..." 
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ width: '100%', paddingLeft: 36 }}
+            />
+          </div>
         </div>
-
-        <select value={filterType} onChange={e => setFilterType(e.target.value)}>
-          <option value="all">Tur: Barchasi</option>
-          <option value="income">Kirim</option>
-          <option value="expense">Xarajat</option>
-        </select>
-
-        <select value={filterDept} onChange={e => setFilterDept(e.target.value)}>
-          <option value="all">Bo'lim: Barchasi</option>
-          <option value="oquv">🎓 O'quv Markaz</option>
-          <option value="marketing">📣 Marketing</option>
-        </select>
-
-        <div className="date-range-group">
-          <label className="date-label">Dan:</label>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={e => setDateFrom(e.target.value)}
-          />
+        <div className="filter-group">
+          <label>Turi</label>
+          <select value={filterType} onChange={e => setFilterType(e.target.value)}>
+            <option value="all">Barchasi</option>
+            <option value="income">Kirim</option>
+            <option value="expense">Xarajat</option>
+          </select>
         </div>
-
-        <div className="date-range-group">
-          <label className="date-label">Gacha:</label>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={e => setDateTo(e.target.value)}
-          />
-        </div>
-
-        {hasFilters && (
-          <button className="btn-icon danger" onClick={clearFilters} title="Filtrlarni tozalash">
-            <X size={14}/> Tozalash
-          </button>
+        {can('manageUsers') && (
+          <div className="filter-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
+            <button 
+              className={`btn-secondary ${showDeleted ? 'active' : ''}`} 
+              onClick={() => setShowDeleted(!showDeleted)}
+              title="O'chirilgan operatsiyalarni ham ko'rish (Audit)"
+              style={{ background: showDeleted ? '#fee2e2' : '', color: showDeleted ? '#ef4444' : '', borderColor: showDeleted ? '#fca5a5' : '' }}
+            >
+              <ShieldAlert size={16}/> {showDeleted ? "O'chirilganlarni bekitish" : "O'chirilganlarni ko'rsatish"}
+            </button>
+          </div>
         )}
       </div>
 
-      {/* ── Summary Row ── */}
-      <div className="summary-row">
-        <div className="summary-item">
-          <span className="summary-label">💚 Kirim</span>
-          <span className="sum-income">{formatCurrency(totalIncome)}</span>
-        </div>
-        <div className="summary-divider"/>
-        <div className="summary-item">
-          <span className="summary-label">🔴 Xarajat</span>
-          <span className="sum-expense">{formatCurrency(totalExpense)}</span>
-        </div>
-        <div className="summary-divider"/>
-        <div className="summary-item">
-          <span className="summary-label">💰 Balans</span>
-          <span className={`sum-profit ${totalIncome - totalExpense >= 0 ? 'positive' : 'negative'}`}>
-            {formatCurrency(totalIncome - totalExpense)}
-          </span>
-        </div>
-      </div>
-
-      {/* ── Table / Cards ── */}
-      {loading ? <div className="full-center"><div className="spinner"/></div> : (
-        <>
-          {/* Desktop table */}
-          <div className="card no-pad desktop-only">
+      <div className="card no-pad">
+        {loading ? <div className="full-center" style={{ padding: 40 }}><div className="spinner"/></div> : (
+          <div className="table-responsive">
             <table className="txn-table">
               <thead>
                 <tr>
-                  <th>Sana</th>
-                  <th>Tur</th>
-                  <th>Bo'lim</th>
-                  <th>Kategoriya</th>
-                  <th>Izoh / Kreditor</th>
+                  <th>Sana & Vaqt</th>
+                  <th>Kategoriya & Izoh</th>
+                  <th>Bo'lim & Usul</th>
+                  <th>Kiritdi / Xodim</th>
                   <th style={{ textAlign: 'right' }}>Summa</th>
-                  <th>Amallar</th>
+                  <th style={{ textAlign: 'center' }}>Hujjat</th>
+                  {can('deleteTransaction') && <th></th>}
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(t => {
-                  const cat = getCategoryInfo(t.category, t.type)
+                  const isDeleted = !!t.deleted_at
                   return (
-                    <tr key={t.id}>
-                      <td className="date-cell">{formatDate(t.transaction_date)}</td>
-                      <td><span className={`type-badge ${t.type}`}>{t.type === 'income' ? 'Kirim' : 'Xarajat'}</span></td>
-                      <td><span className="dept-badge">{DEPT_LABELS[t.department]}</span></td>
-                      <td><span className="cat-dot-badge" style={{ background: cat.color + '22', color: cat.color }}>{cat.label}</span></td>
+                    <tr key={t.id} style={{ opacity: isDeleted ? 0.6 : 1, background: isDeleted ? '#f8fafc' : 'white' }}>
                       <td>
-                        <div style={{ fontWeight: 500 }}>{t.note || '—'}</div>
-                        {t.third_party_name && (
-                          <small className="third-party-tag">📝 {t.third_party_name} (qarz)</small>
-                        )}
-                      </td>
-                      <td className={`amount-cell ${t.type}`}>
-                        {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
-                      </td>
-                      <td>
-                        <div className="action-btns">
-                          {t.receipt_url && (
-                            <button className="btn-icon" onClick={() => setPreviewImg(t.receipt_url)} title="Chekni ko'rish">
-                              <Eye size={14}/>
-                            </button>
-                          )}
-                          {isOwner && (
-                            <button className="btn-icon" onClick={() => setEditTxn(t)} title="Tahrirlash">
-                              <Edit3 size={14}/>
-                            </button>
-                          )}
-                          {can('deleteTransaction') && (
-                            <button className="btn-icon danger" onClick={() => setDeleteId(t.id)} title="O'chirish">
-                              <Trash2 size={14}/>
-                            </button>
-                          )}
+                        <div style={{ textDecoration: isDeleted ? 'line-through' : 'none' }}>{t.transaction_date}</div>
+                        <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                          {new Date(t.created_at).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       </td>
+                      <td>
+                        <strong style={{ textDecoration: isDeleted ? 'line-through' : 'none' }}>{t.category}</strong>
+                        {t.note && <div style={{ fontSize: 12, color: '#64748b' }}>{t.note}</div>}
+                        {t.third_party_name && <div style={{ fontSize: 12, color: '#8b5cf6', fontWeight: 500 }}>👤 {t.third_party_name}</div>}
+                        {isDeleted && <span className="status-badge inactive" style={{ marginTop: 4 }}>O'chirilgan ({new Date(t.deleted_at).toLocaleDateString()})</span>}
+                      </td>
+                      <td>
+                        <div>{DEPT_LABELS[t.department] || t.department}</div>
+                        <div style={{ fontSize: 12, color: '#64748b', textTransform: 'capitalize' }}>{t.payment_method}</div>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: '#475569' }}>
+                            {t.profiles?.full_name?.[0] || '?'}
+                          </div>
+                          <span style={{ fontSize: 13, fontWeight: 500, color: '#475569' }}>{t.profiles?.full_name || 'Noma\'lum'}</span>
+                        </div>
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 600, color: isDeleted ? '#94a3b8' : (t.type === 'income' ? '#10b981' : '#0f172a'), textDecoration: isDeleted ? 'line-through' : 'none' }}>
+                        {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        {t.receipt_url ? (
+                          <a href={t.receipt_url} target="_blank" rel="noreferrer" className="btn-icon" title="Chekni ko'rish">
+                            <Eye size={16} />
+                          </a>
+                        ) : '—'}
+                      </td>
+                      {can('deleteTransaction') && (
+                        <td style={{ textAlign: 'center' }}>
+                          {!isDeleted && (
+                            <button className="btn-icon" style={{ color: '#ef4444' }} onClick={() => setDelTxn(t)} title="Bekor qilish">
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   )
                 })}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>Yozuv topilmadi</td></tr>
+                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>Ma'lumot topilmadi</td></tr>
                 )}
               </tbody>
             </table>
           </div>
-
-          {/* Mobile cards */}
-          <div className="txn-cards mobile-only">
-            {filtered.map(t => {
-              const cat = getCategoryInfo(t.category, t.type)
-              return (
-                <div key={t.id} className="txn-card">
-                  <div className="txn-card-top">
-                    <span className={`type-badge ${t.type}`}>{t.type === 'income' ? 'Kirim' : 'Xarajat'}</span>
-                    <span className={`txn-amount ${t.type === 'income' ? 'income-text' : 'expense-text'}`}>
-                      {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
-                    </span>
-                  </div>
-                  <div className="txn-card-body">
-                    <div className="txn-cat" style={{ color: cat.color }}>{cat.label}</div>
-                    <div className="txn-note">{t.note || t.category}</div>
-                    {t.third_party_name && <div className="third-party-tag">📝 {t.third_party_name} (qarz)</div>}
-                    <div className="txn-meta">{DEPT_LABELS[t.department]} · {formatDate(t.transaction_date)}</div>
-                  </div>
-                  <div className="txn-card-actions">
-                    {t.receipt_url && <button className="btn-icon" onClick={() => setPreviewImg(t.receipt_url)}><Eye size={14}/> Chek</button>}
-                    {isOwner && <button className="btn-icon" onClick={() => setEditTxn(t)}><Edit3 size={14}/> Tahrir</button>}
-                    {can('deleteTransaction') && <button className="btn-icon danger" onClick={() => setDeleteId(t.id)}><Trash2 size={14}/></button>}
-                  </div>
-                </div>
-              )
-            })}
-            {filtered.length === 0 && <div className="empty-state"><p>Yozuv topilmadi</p></div>}
-          </div>
-        </>
-      )}
+        )}
+      </div>
     </div>
   )
 }

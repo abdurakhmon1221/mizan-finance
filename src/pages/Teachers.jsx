@@ -7,7 +7,13 @@ import { Presentation, UserPlus, Check, Banknote } from 'lucide-react'
 // ── Pay Modal ─────────────────────────────────────────────────────────────────
 function PayModal({ teacher, onClose, onSaved }) {
   const { profile } = useAuth()
-  const [amount, setAmount] = useState(String(teacher.base_salary))
+  
+  // Default amount to the remaining balance (expected - paid)
+  const defaultAmount = teacher.expectedSalary > teacher.thisMonthPaid 
+    ? String(teacher.expectedSalary - teacher.thisMonthPaid)
+    : String(teacher.base_salary) // fallback if fixed or negative
+
+  const [amount, setAmount] = useState(defaultAmount)
   const [payMethod, setPayMethod] = useState('cash')
   const [note, setNote] = useState(`${teacher.full_name} (${teacher.subject}) oylik maosh / avans`)
   const [saving, setSaving] = useState(false)
@@ -74,7 +80,7 @@ function PayModal({ teacher, onClose, onSaved }) {
         <div className="modal-actions">
           <button className="btn-secondary" onClick={onClose}>Bekor</button>
           <button className="btn-primary" onClick={handleSave} disabled={saving}>
-            <Check size={16}/> {saving ? 'Saqlanmoqda...' : 'To'lash'}
+            <Check size={16}/> {saving ? 'Saqlanmoqda...' : 'To\'lash'}
           </button>
         </div>
       </div>
@@ -103,21 +109,42 @@ export default function TeachersPage() {
 
   const fetchTeachers = async () => {
     setLoading(true)
-    // O'qituvchilarni va ularga to'langan pullarni olish (oxirgi oylik ma'lumotlari bo'yicha)
     const currentMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
     
-    const { data: tchData, error } = await supabase
-      .from('teachers')
-      .select('*, transactions(amount, transaction_date)')
-      .order('created_at', { ascending: false })
+    // Fetch all needed data for calculation
+    const [tchRes, stRes, grRes, txnRes] = await Promise.all([
+      supabase.from('teachers').select('*, transactions(amount, transaction_date)').order('created_at', { ascending: false }),
+      supabase.from('students').select('id, group_id'),
+      supabase.from('groups').select('id, teacher_id'),
+      supabase.from('transactions').select('amount, student_id').eq('type', 'income').like('transaction_date', `${currentMonth}%`)
+    ])
 
-    if (error) {
-      console.error(error)
+    if (tchRes.error) {
+      console.error(tchRes.error)
       setLoading(false)
       return
     }
 
-    const formatted = tchData.map(tch => {
+    const students = stRes.data || []
+    const groups = grRes.data || []
+    const incomeTxns = txnRes.data || []
+
+    // Calculate total generated income for each teacher
+    const generatedIncomeByTeacher = {}
+    
+    incomeTxns.forEach(txn => {
+      if (!txn.student_id) return
+      const student = students.find(s => s.id === txn.student_id)
+      if (!student || !student.group_id) return
+      
+      const group = groups.find(g => g.id === student.group_id)
+      if (!group || !group.teacher_id) return
+      
+      const tId = group.teacher_id
+      generatedIncomeByTeacher[tId] = (generatedIncomeByTeacher[tId] || 0) + txn.amount
+    })
+
+    const formatted = tchRes.data.map(tch => {
       const txns = tch.transactions || []
       
       // Jami barcha to'langan pullar
@@ -132,7 +159,25 @@ export default function TeachersPage() {
         ? txns.sort((a,b) => new Date(b.transaction_date) - new Date(a.transaction_date))[0].transaction_date
         : null
         
-      return { ...tch, totalPaid, thisMonthPaid, lastPayment }
+      // Calculate expected salary
+      let expectedSalary = 0
+      let generatedIncome = 0
+      
+      if (tch.salary_type === 'percentage') {
+        generatedIncome = generatedIncomeByTeacher[tch.id] || 0
+        expectedSalary = (generatedIncome * tch.base_salary) / 100
+      } else {
+        expectedSalary = tch.base_salary
+      }
+
+      return { 
+        ...tch, 
+        totalPaid, 
+        thisMonthPaid, 
+        lastPayment, 
+        expectedSalary,
+        generatedIncome
+      }
     })
 
     setTeachers(formatted)
@@ -179,7 +224,7 @@ export default function TeachersPage() {
       <div className="page-header">
         <div>
           <h1><Presentation size={24} style={{ display: 'inline', verticalAlign: 'text-bottom' }}/> Xodimlar & O'qituvchilar</h1>
-          <p>O'qituvchilar bazasi, oylik va avans to'lovlari</p>
+          <p>O'qituvchilar maoshi avtomatik hisoblanadi</p>
         </div>
         {(can('manageUsers') || can('addTransaction')) && (
           <button className="btn-primary" onClick={() => setShowForm(!showForm)}>
@@ -212,7 +257,7 @@ export default function TeachersPage() {
               </select>
             </div>
             <div className="form-group">
-              <label>{salaryType === 'fixed' ? "Oylik maosh summasi *" : "Foiz (masalan 40%) *"}</label>
+              <label>{salaryType === 'fixed' ? "Oylik maosh summasi *" : "Foiz (masalan 40) *"}</label>
               <input 
                 type="text" 
                 inputMode="numeric"
@@ -248,52 +293,63 @@ export default function TeachersPage() {
               <thead>
                 <tr>
                   <th>F.I.O</th>
-                  <th>Mutaxassislik</th>
                   <th>Kelishuv</th>
-                  <th>Bu oyda olgan pullari</th>
-                  <th>Oxirgi to'lov</th>
+                  <th style={{ textAlign: 'right' }}>Kutilayotgan Maosh</th>
+                  <th style={{ textAlign: 'right' }}>To'langan (Bu oy)</th>
+                  <th style={{ textAlign: 'right' }}>Qoldiq</th>
                   <th style={{ textAlign: 'center' }}>Amallar</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(t => (
-                  <tr key={t.id} style={{ opacity: t.is_active ? 1 : 0.5 }}>
-                    <td>
-                      <strong>{t.full_name}</strong>
-                      {!t.is_active && <span className="status-badge inactive" style={{ marginLeft: 8 }}>Nofaol</span>}
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 500 }}>{t.subject || '—'}</div>
-                      <div style={{ fontSize: 12, color: '#64748b' }}>{t.phone || '—'}</div>
-                    </td>
-                    <td>
-                      {t.salaryType === 'percentage' 
-                        ? <span style={{ color: '#8b5cf6', fontWeight: 600 }}>{t.base_salary}% ulush</span>
-                        : <span style={{ color: '#1e40af', fontWeight: 600 }}>{formatCurrency(t.base_salary)} fixed</span>
-                      }
-                    </td>
-                    <td style={{ color: '#ef4444', fontWeight: 600 }}>{formatCurrency(t.thisMonthPaid)}</td>
-                    <td style={{ fontSize: 13 }}>{t.lastPayment || <span style={{color: '#94a3b8'}}>To'lanmagan</span>}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                        {t.is_active && can('addTransaction') && (
-                          <button className="btn-primary" style={{ padding: '6px 12px', fontSize: 13, background: '#f59e0b', color: 'white' }} onClick={() => setPayTeacher(t)}>
-                            <Banknote size={14} style={{ marginRight: 4 }}/> To'lash
-                          </button>
-                        )}
-                        {(can('manageUsers') || can('deleteTransaction')) && (
-                          <button 
-                            className={`btn-secondary ${t.is_active ? '' : 'active'}`} 
-                            style={{ padding: '6px 12px', fontSize: 13 }} 
-                            onClick={() => toggleActive(t.id, t.is_active)}
-                          >
-                            {t.is_active ? "To'xtatish" : "Faollashtirish"}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map(t => {
+                  const remaining = t.expectedSalary - t.thisMonthPaid;
+                  
+                  return (
+                    <tr key={t.id} style={{ opacity: t.is_active ? 1 : 0.5 }}>
+                      <td>
+                        <strong>{t.full_name}</strong>
+                        {!t.is_active && <span className="status-badge inactive" style={{ marginLeft: 8 }}>Nofaol</span>}
+                        <div style={{ fontSize: 12, color: '#64748b' }}>{t.subject || '—'}</div>
+                      </td>
+                      <td>
+                        {t.salary_type === 'percentage' 
+                          ? <div>
+                              <span style={{ color: '#8b5cf6', fontWeight: 600 }}>{t.base_salary}% ulush</span>
+                              <div style={{ fontSize: 11, color: '#64748b' }}>Tushum: {formatCurrency(t.generatedIncome)}</div>
+                            </div>
+                          : <span style={{ color: '#1e40af', fontWeight: 600 }}>{formatCurrency(t.base_salary)} fiks</span>
+                        }
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
+                        {formatCurrency(t.expectedSalary)}
+                      </td>
+                      <td style={{ textAlign: 'right', color: '#10b981', fontWeight: 600 }}>
+                        {formatCurrency(t.thisMonthPaid)}
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 700, color: remaining > 0 ? '#ef4444' : '#64748b' }}>
+                        {remaining > 0 ? formatCurrency(remaining) : (remaining < 0 ? `+${formatCurrency(Math.abs(remaining))}` : '0')}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                          {t.is_active && can('addTransaction') && (
+                            <button className="btn-primary" style={{ padding: '6px 12px', fontSize: 13, background: '#f59e0b', color: 'white' }} onClick={() => setPayTeacher(t)}>
+                              <Banknote size={14} style={{ marginRight: 4 }}/> To'lash
+                            </button>
+                          )}
+                          {(can('manageUsers') || can('deleteTransaction')) && (
+                            <button 
+                              className={`btn-secondary ${t.is_active ? '' : 'active'}`} 
+                              style={{ padding: '6px 12px', fontSize: 13 }} 
+                              onClick={() => toggleActive(t.id, t.is_active)}
+                            >
+                              {t.is_active ? "To'xt" : "Faol"}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
                 {filtered.length === 0 && (
                   <tr><td colSpan={6} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>Xodimlar topilmadi</td></tr>
                 )}

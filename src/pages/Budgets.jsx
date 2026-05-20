@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { formatCurrency, EXPENSE_CATEGORIES, DEPARTMENTS } from '../lib/constants'
-import { Target, Check, AlertCircle } from 'lucide-react'
+import { Target, Check, AlertCircle, Copy } from 'lucide-react'
 
 export default function BudgetsPage() {
   const { profile, can } = useAuth()
@@ -16,6 +16,7 @@ export default function BudgetsPage() {
   const [editCat, setEditCat] = useState(null)
   const [editLimit, setEditLimit] = useState('')
   const [saving, setSaving] = useState(false)
+  const [copying, setCopying] = useState(false)
 
   useEffect(() => { fetchBudgets() }, [month, dept])
 
@@ -31,7 +32,6 @@ export default function BudgetsPage() {
       
     // 2. Fetch ACTUAL expenses for this month and dept
     const startDate = `${month}-01`
-    // End date calculation (approximate by going to next month first day)
     const [y, m] = month.split('-')
     const nextMonth = new Date(y, m, 1).toISOString().split('T')[0]
     
@@ -70,7 +70,6 @@ export default function BudgetsPage() {
     setSaving(true)
     const numLimit = parseInt(editLimit.replace(/\D/g, ''), 10) || 0
 
-    // Upsert budget
     const { error } = await supabase.from('budgets').upsert({
       month_year: month,
       department: dept,
@@ -88,6 +87,49 @@ export default function BudgetsPage() {
     }
   }
 
+  const copyFromPreviousMonth = async () => {
+    if (!window.confirm("Oldingi oy byudjetini ushbu oyga ko'chirishni xohlaysizmi? Ushbu oydagi barcha limitlar ustidan yoziladi.")) return
+    
+    setCopying(true)
+    const [y, m] = month.split('-')
+    let prevMonth = new Date(y, m - 2, 1).toISOString().slice(0, 7) // m is 1-indexed string in Date, but doing math is tricky. 
+    // Safest way:
+    const d = new Date(y, parseInt(m) - 1, 1) // current month
+    d.setMonth(d.getMonth() - 1)
+    prevMonth = d.toISOString().slice(0, 7)
+
+    const { data: prevBudgets } = await supabase
+      .from('budgets')
+      .select('category, limit_amount')
+      .eq('month_year', prevMonth)
+      .eq('department', dept)
+
+    if (!prevBudgets || prevBudgets.length === 0) {
+      alert("Oldingi oyda byudjet kiritilmagan.")
+      setCopying(false)
+      return
+    }
+
+    const inserts = prevBudgets.map(b => ({
+      month_year: month,
+      department: dept,
+      category: b.category,
+      limit_amount: b.limit_amount,
+      created_by: profile.id
+    }))
+
+    const { error } = await supabase.from('budgets').upsert(inserts, { onConflict: 'month_year,department,category' })
+    
+    setCopying(false)
+    if (error) alert("Xato: " + error.message)
+    else fetchBudgets()
+  }
+
+  const totalBudget = budgets.reduce((s, b) => s + b.limit_amount, 0)
+  const totalActual = budgets.reduce((s, b) => s + b.actual, 0)
+  const totalPercent = totalBudget > 0 ? (totalActual / totalBudget) * 100 : 0
+  const isTotalOver = totalPercent > 100
+
   return (
     <div className="page">
       <div className="page-header">
@@ -95,6 +137,11 @@ export default function BudgetsPage() {
           <h1><Target size={24} style={{ display: 'inline', verticalAlign: 'text-bottom' }}/> Byudjet Limitlari</h1>
           <p>Kategoriyalar bo'yicha oylik maksimal xarajat limitini belgilang</p>
         </div>
+        {can('manageUsers') && (
+          <button className="btn-secondary" onClick={copyFromPreviousMonth} disabled={copying}>
+            <Copy size={15}/> {copying ? "Ko'chirilmoqda..." : "Oldingi oydan nusxalash"}
+          </button>
+        )}
       </div>
 
       <div className="filter-bar">
@@ -108,6 +155,25 @@ export default function BudgetsPage() {
             <option value={DEPARTMENTS.MARKETING}>📣 Marketing</option>
             <option value={DEPARTMENTS.OQUV}>🎓 O'quv Markaz</option>
           </select>
+        </div>
+      </div>
+
+      <div className="summary-row" style={{ marginBottom: 24 }}>
+        <div className="summary-item">
+          <span className="summary-label">Belgilangan Byudjet</span>
+          <span className="sum-income" style={{ color: '#3b82f6' }}>{formatCurrency(totalBudget)}</span>
+        </div>
+        <div className="summary-divider"/>
+        <div className="summary-item">
+          <span className="summary-label">Haqiqatda Sarflandi</span>
+          <span className="sum-expense">{formatCurrency(totalActual)}</span>
+        </div>
+        <div className="summary-divider"/>
+        <div className="summary-item">
+          <span className="summary-label">Holat</span>
+          <span className="sum-profit" style={{ color: isTotalOver ? '#ef4444' : '#10b981' }}>
+            {totalPercent.toFixed(1)}% {isTotalOver ? 'Oshib ketdi' : 'Norma'}
+          </span>
         </div>
       </div>
 
@@ -162,7 +228,8 @@ export default function BudgetsPage() {
                             <span style={{ fontSize: 12, fontWeight: 500, color: isOver ? '#ef4444' : '#64748b' }}>
                               {Math.round(percent)}%
                             </span>
-                            {isOver && <AlertCircle size={14} color="#ef4444" />}
+                            {isOver && <AlertCircle size={14} color="#ef4444" title="Limitdan oshib ketdi!" />}
+                            {isWarning && <AlertCircle size={14} color="#f59e0b" title="Limitga yaqinlashdi" />}
                           </div>
                         )}
                       </td>

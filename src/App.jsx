@@ -13,6 +13,7 @@ import Students from './pages/Students'
 import Teachers from './pages/Teachers'
 import Budgets from './pages/Budgets'
 import NoAccess from './pages/NoAccess'
+import Groups from './pages/Groups'
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
           <Route path="/students" element={<ProtectedRoute><Layout><Students /></Layout></ProtectedRoute>} />
           <Route path="/teachers" element={<ProtectedRoute><Layout><Teachers /></Layout></ProtectedRoute>} />
           <Route path="/add" element={<ProtectedRoute require="addTransaction"><Layout><AddTransaction /></Layout></ProtectedRoute>} />
+          <Route path="/groups" element={<ProtectedRoute><Layout><Groups /></Layout></ProtectedRoute>} />
           <Route path="/budgets" element={<ProtectedRoute require="manageUsers"><Layout><Budgets /></Layout></ProtectedRoute>} />
           <Route path="/transactions" element={<ProtectedRoute><Layout><Transactions /></Layout></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute require="viewReports"><Layout><Reports /></Layout></ProtectedRoute>} />

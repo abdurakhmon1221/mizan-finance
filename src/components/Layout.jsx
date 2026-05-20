@@ -8,6 +8,7 @@ import { ROLE_LABELS } from '../lib/constants'
 const navItems = [
   { to: '/',              icon: BarChart2,      label: 'Dashboard',    perm: 'viewDashboard' },
   { to: '/students',      icon: GraduationCap,  label: 'O\'quvchilar',  perm: null },
+  { to: '/groups',        icon: Users,          label: 'Guruhlar',     perm: null },
   { to: '/teachers',      icon: Presentation,   label: 'Xodimlar',     perm: null },
   { to: '/transactions',  icon: Wallet,         label: 'Tranzaksiyalar', perm: null },
   { to: '/add',           icon: PlusCircle,     label: 'Qo\'shish',    perm: 'addTransaction' },
